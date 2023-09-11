@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Button, Card, List, Modal, PaperProvider, Portal, Text, TextInput } from "react-native-paper";
 
@@ -8,15 +9,37 @@ export default function Home(){
         email: ''
     })
     const [toDo, setToDo] = useState(false)
-    const [cards, setCards] = useState([{title: "Praia", description: "Eu gosto de ir a praia", category: "ea", image: "https://st.depositphotos.com/1010338/2099/i/600/depositphotos_20999947-stock-photo-tropical-island-with-palms.jpg"}])
+    const [cards, setCards] = useState([])
     const [select, setSelect] = useState('')
     const [categories, setCategories] = useState(["ea", "eaeeae"])
     const [filter, setFilter] = useState('')
     const [note, setNote] = useState({
       title: '',
       description: '',
-      category: ''
+      category: '',
+      image: ''
     })
+
+   async function createNotes(){
+      await axios.post('http://localhost:5000/notes', {
+         title: note.title,
+         description: note.description,
+         category: note.category,
+         image: note.image
+      }, {})
+      await getCategories()
+   }
+
+   async function getCategories(){
+      const {data} = await axios.get('http://localhost:5000/notes', {})
+      setCards(data)
+   }
+
+   useEffect(async () => {
+      await getCategories()
+   }, [])
+
+   console.log(cards)
 
     return (
         <View style={styles.homeContainer}>
@@ -28,63 +51,72 @@ export default function Home(){
                      <Button onPress={() => setToDo(true)} icon={"plus"} mode="contained"></Button>
                   </ScrollView>
                </View>
-               <Modal visible={toDo} onDismiss={() => {
-                  setToDo(false)
-                  setNote({
-                     title: '',
-                     description: '',
-                   })
-                  setSelect('')
-                  }} contentContainerStyle={{backgroundColor: 'white', padding: 20}}>
-                  <TextInput
-                     mode="outlined"
-                     label="Título"
-                     value={note.title}
-                     placeholder="Meu bloquinho..."
-                     onChangeText={(e) => { 
-                        setNote({...note, title: e})
-                        console.log(note)
-                     }}
-                  />
-                  
-                  <TextInput
-                     mode="outlined"
-                     label="Descrição"
-                     dense="4dp"
-                     placeholder="Neste bloco..."
-                     style={{height: 150}}
-                     multiline={true}
-                     onChangeText={(e) => { 
-                        setNote({...note, description: e})
-                        console.log(note)
-                     }}
-                  />
-                  <List.Section>
-                     <List.Accordion
-                     title="Categoria"
-                     left={props => <List.Icon {...props} icon="folder" />}>
-                        {categories.map((category, index) => {
-                           return(
-                              <List.Item 
-                                 key={index} 
-                                 title={category}
-                                 backgroundColor={select === category ? "#E8E6E3" : "white"}
-                                 onPress={() => {
-                                    setSelect(category)
-                                    setNote({...note, category: category})
-                                    console.log(note)
-                                 }}
-                              />
-                           )
-                        })}
-                     </List.Accordion>
-                  </List.Section>
-                  <Button
-                     onPress={() => {
-                        
-                     }}
-                  >Adicione</Button>
-               </Modal> 
+               {toDo ? <View style={styles.homeContainer2}
+                  onDismiss={() => {
+                     setToDo(false)
+                     setNote({
+                        title: '',
+                        description: '',
+                     })}}
+               >
+                  <Modal visible={toDo} onDismiss={() => {
+                     setToDo(false)
+                     setNote({
+                        title: '',
+                        description: '',
+                     })
+                     setSelect('')
+                     }} contentContainerStyle={{backgroundColor: 'white', padding: 20}}>
+                     <TextInput
+                        mode="outlined"
+                        label="Título"
+                        value={note.title}
+                        placeholder="Meu bloquinho..."
+                        onChangeText={(e) => { 
+                           setNote({...note, title: e})
+                           console.log(note)
+                        }}
+                     />
+                     
+                     <TextInput
+                        mode="outlined"
+                        label="Descrição"
+                        dense="4dp"
+                        placeholder="Neste bloco..."
+                        style={{height: 150}}
+                        multiline={true}
+                        onChangeText={(e) => { 
+                           setNote({...note, description: e})
+                           console.log(note)
+                        }}
+                     />
+                     <List.Section>
+                        <List.Accordion
+                        title="Categoria"
+                        left={props => <List.Icon {...props} icon="folder" />}>
+                           {categories.map((category, index) => {
+                              return(
+                                 <List.Item 
+                                    key={index} 
+                                    title={category}
+                                    backgroundColor={select === category ? "#E8E6E3" : "white"}
+                                    onPress={() => {
+                                       setSelect(category)
+                                       setNote({...note, category: category})
+                                       console.log(note)
+                                    }}
+                                 />
+                              )
+                           })}
+                        </List.Accordion>
+                     </List.Section>
+                     <Button
+                        onPress={async () => {
+                           await createNotes()
+                        }}
+                     >Adicione</Button>
+                  </Modal>
+               </View> : null} 
                <List.Section>
                   <List.Accordion
                   title="Selecione a Categoria"
@@ -143,5 +175,11 @@ const styles = StyleSheet.create({
         },
         homeContainer:{
             height: "100%"
+        },
+        homeContainer2:{
+            position: "absolute",
+            height: "100%",
+            width: "100%",
+            zIndex: 1
         }
     })
