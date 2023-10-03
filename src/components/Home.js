@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Button, Card, List, Modal, PaperProvider, Portal, Text, TextInput } from "react-native-paper";
+import { API_URL } from "@env";
 
 export default function Home(){
     const [user, setUser] = useState({
@@ -11,35 +12,44 @@ export default function Home(){
     const [toDo, setToDo] = useState(false)
     const [cards, setCards] = useState([])
     const [select, setSelect] = useState('')
-    const [categories, setCategories] = useState(["ea", "eaeeae"])
+    const [categories, setCategories] = useState([])
+    const [createCategory, setCreateCategory] = useState(false)
+    const [newCategory, setNewCategory] = useState('')
+    const [editCard, setEditCard] = useState(0)
     const [filter, setFilter] = useState('')
     const [note, setNote] = useState({
       title: '',
       description: '',
-      category: '',
+      categoryName: '',
       image: ''
     })
 
    async function createNotes(){
-      await axios.post('http://localhost:5000/notes', {
+      await axios.post(`${API_URL}/notes`, {
          title: note.title,
          description: note.description,
-         category: note.category,
+         categoryName: note.categoryName,
          image: note.image
       }, {})
-      await getCategories()
+      await getNotes()
+   }
+
+   async function getNotes(){
+      const {data} = await axios.get(`${API_URL}/notes`, {})
+      setCards([...data])
+      console.log(data)
    }
 
    async function getCategories(){
-      const {data} = await axios.get('http://localhost:5000/notes', {})
-      setCards(data)
+      const {data} = await axios.get(`${API_URL}/categories`, {})
+      setCategories([...data])
+      console.log(data)
    }
 
    useEffect(async () => {
+      await getNotes()
       await getCategories()
    }, [])
-
-   console.log(cards)
 
     return (
         <View style={styles.homeContainer}>
@@ -98,23 +108,53 @@ export default function Home(){
                               return(
                                  <List.Item 
                                     key={index} 
-                                    title={category}
-                                    backgroundColor={select === category ? "#E8E6E3" : "white"}
+                                    title={category.name}
+                                    backgroundColor={select === category.name ? "#E8E6E3" : "white"}
                                     onPress={() => {
-                                       setSelect(category)
-                                       setNote({...note, category: category})
-                                       console.log(note)
+                                       setSelect(category.name)
+                                       setNote({...note, categoryName: category.name})
                                     }}
                                  />
                               )
                            })}
+                           <List.Item
+                              title="Adicionar Categoria"
+                              onPress={() => {
+                                 setCreateCategory(true)
+                              }}
+                           />
                         </List.Accordion>
                      </List.Section>
                      <Button
                         onPress={async () => {
                            await createNotes()
+                           setToDo(false)
                         }}
                      >Adicione</Button>
+                  </Modal>
+                  <Modal visible={createCategory} onDismiss={() => {
+                     setCreateCategory(false)
+                     }} contentContainerStyle={{backgroundColor: 'white', padding: 20}}>
+                        <TextInput
+                        mode="outlined"
+                        label="Nova Categoria"
+                        dense="4dp"
+                        placeholder="Categoria..."
+                        style={{height: 50}}
+                        onChangeText={(e) => { 
+                           setNewCategory(e)
+                        }}
+                     />
+                     <Button
+                        onPress={async () => {
+                           await axios.post(`${API_URL}/categories`, {
+                              category: newCategory
+                           }, {})
+                           await getCategories()
+                           setCreateCategory(false)
+                           setNewCategory('')
+                        }}
+                     >Criar</Button>
                   </Modal>
                </View> : null} 
                <List.Section>
@@ -125,10 +165,20 @@ export default function Home(){
                         return(
                            <List.Item 
                               key={index} 
-                              title={category}
-                              backgroundColor={filter === category ? "#E8E6E3" : "white"}
+                              title={category.name}
+                              right={
+                                 (props) => {
+                                    return(
+                                       <View>
+                                          <Button onPress={() => {console.log("eaeaea")}} style={{height: 50}}> 
+                                             <List.Icon {...props} key={index} icon="delete"/>
+                                          </Button>
+                                       </View>)
+                                 }
+                              }
+                              backgroundColor={filter === category.name ? "#E8E6E3" : "white"}
                               onPress={() => {
-                                 setFilter(category === filter ? '' : category)
+                                 setFilter(category.name === filter ? '' : category.name)
                               }}
                            />
                         )
@@ -136,7 +186,7 @@ export default function Home(){
                   </List.Accordion>
                </List.Section>
                {cards.map((card) => {
-                  if(card.category !== filter && filter !== ''){
+                  if(card.categoryName !== filter && filter !== ''){
                      return
                   }
                   return(
@@ -147,12 +197,78 @@ export default function Home(){
                         </Card.Content>
                         {card.image ? <Card.Cover source={{ uri: card.image}} /> : null}
                         <Card.Actions>
-                           <Button>Remover</Button>
-                           <Button>Editar</Button>
+                           <Button onPress={async () => {
+                              await axios.delete(`${API_URL}/notes/${card.id}`, {})
+                              await getNotes()
+                           }}>Remover</Button>
+                           <Button onPress={async () => {
+                              setEditCard(card.id)
+                           }}>Editar</Button>
                         </Card.Actions>
                      </Card>
                   )
                })}
+               <Modal visible={editCard ? true : false}
+                  onDismiss={() => {setEditCard(false)}} 
+                  contentContainerStyle={{backgroundColor: 'white', padding: 20}}>
+                  <TextInput
+                     mode="outlined"
+                     label="Título"
+                     value={note.title}
+                     placeholder="Meu bloquinho..."
+                     onChangeText={(e) => { 
+                        setNote({...note, title: e})
+                     }}
+                  />
+                  <TextInput
+                     mode="outlined"
+                     label="Descrição"
+                     dense="4dp"
+                     placeholder="Neste bloco..."
+                     style={{height: 150}}
+                     multiline={true}
+                     onChangeText={(e) => { 
+                        setNote({...note, description: e})
+                     }}
+                  />
+                  <List.Section>
+                     <List.Accordion
+                     title="Categoria"
+                     left={props => <List.Icon {...props} icon="folder" />}>
+                        {categories.map((category, index) => {
+                           return(
+                              <List.Item 
+                                 key={index} 
+                                 title={category.name}
+                                 backgroundColor={select === category.name ? "#E8E6E3" : "white"}
+                                 onPress={() => {
+                                    setSelect(category.name)
+                                    setNote({...note, categoryName: category.name})
+                                 }}
+                              />
+                           )
+                        })}
+                        <List.Item
+                           title="Adicionar Categoria"
+                           onPress={() => {
+                              setCreateCategory(true)
+                           }}
+                        />
+                     </List.Accordion>
+                  </List.Section>
+                  <Button
+                     onPress={async () => {
+                        await axios.put(`${API_URL}/notes/${editCard}`, {
+                           title: note.title,
+                           description: note.description,
+                           categoryName: note.categoryName,
+                           image: note.image
+                        }, {})
+                        await getNotes()
+                        setEditCard(false)
+                     }}
+                  >Editar</Button>
+               </Modal>
             </Portal>
          </PaperProvider>
         </View>
